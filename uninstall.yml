@@ -16,5 +16,7 @@
       ansible.builtin.include_role:
         name: "{{ item }}"
         tasks_from: uninstall.yml
+        apply:
+          tags: "{{ item }}"
       loop: "{{ profiles['common'] + profiles[device_type] }}"
-      tags: "{{ item }}"
+      tags: always

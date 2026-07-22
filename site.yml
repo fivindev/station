@@ -15,5 +15,7 @@
     - name: Apply role
       ansible.builtin.include_role:
         name: "{{ item }}"
+        apply:
+          tags: "{{ item }}"
       loop: "{{ profiles['common'] + profiles[device_type] }}"
-      tags: "{{ item }}"
+      tags: always

@@ -67,9 +67,17 @@ that will ever exist — e.g. keep OS-specific branching keyed on
   for a device_type dynamically; they should almost never need to
   change.
 - **Tag propagation depends on `include_role` (dynamic), not
-  `import_role` (static)**, and on the `tags: "{{ item }}"` pattern
-  already used in `site.yml`/`uninstall.yml`. Don't "simplify" that to
-  `import_role` — it will break `--tags <rolename>` filtering.
+  `import_role` (static — it also doesn't support `loop` at all).**
+  Don't "simplify" that to `import_role`.
+  Putting `tags: "{{ item }}"` directly on the `include_role` task
+  looks like it should work but doesn't — Ansible resolves a task's own
+  `tags:` during a static pre-pass before the loop variable is bound,
+  so it fails with `'item' is undefined`. The actual working pattern
+  (used in `site.yml`/`uninstall.yml`) is `apply: tags: "{{ item }}"`
+  nested inside `include_role`, with a plain `tags: always` on the
+  include task itself so it's never filtered out; `apply.tags` is
+  evaluated per-iteration and propagates onto the tasks the role brings
+  in. Don't move the loop-var tag back onto the bare `tags:` key.
 
 ## What NOT to add
 
