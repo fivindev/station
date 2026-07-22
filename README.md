@@ -21,6 +21,12 @@ provisioning.
    ./bootstrap.sh
    ```
 
+   The script can't change the PATH of the shell you ran it from —
+   only new shells pick up `~/.local/bin` (where uv installs
+   `ansible-playbook`). Open a new terminal/SSH session, or run
+   `source ~/.bashrc`, before the next step. If you skip this you'll
+   see `ansible-playbook: command not found`.
+
 4. Run the playbook, telling it what kind of device this is:
 
    ```
