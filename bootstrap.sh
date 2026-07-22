@@ -11,8 +11,16 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 echo "==> installing ansible via uv"
-# passlib is required for the password_hash filter (used by roles/fivin)
-uv tool install ansible --with passlib
+# Installing `ansible` (not ansible-core) as the top-level uv tool only
+# exposes its own entry point (ansible-community, a version-printing
+# script) — ansible-playbook/ansible-galaxy/etc. belong to ansible-core,
+# which `ansible` merely depends on, so `uv tool install ansible` alone
+# leaves them missing. Installing ansible-core as the tool exposes the
+# real CLI; `--with ansible` still pulls in the full collection bundle,
+# and passlib is required for the password_hash filter (used by
+# roles/fivin).
+uv tool uninstall ansible >/dev/null 2>&1 || true # clean up a stale install from before this fix
+uv tool install ansible-core --with ansible --with passlib
 
 # Makes sure ~/.local/bin is on PATH in your shell rc file going forward.
 # Safe to run every time — it's a no-op if already wired up.
