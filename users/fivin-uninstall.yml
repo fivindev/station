@@ -1,5 +1,5 @@
 ---
-# Companion to fivin.yml. roles/fivin/tasks/uninstall.yml deliberately
+# Companion to users/fivin.yml. roles/fivin/tasks/uninstall.yml deliberately
 # fails loudly with manual removal instructions rather than actually
 # removing the account — see AGENT.md/README.md for why.
 - name: Uninstall the fivin sudo user

@@ -4,7 +4,7 @@
 # site.yml. site.yml itself is meant to be run afterward AS the admin
 # user this playbook creates — not as root. See README.md.
 #
-#   ansible-playbook fivin.yml -e fivin_ssh_public_key="ssh-ed25519 AAAA... you@host"
+#   ansible-playbook users/fivin.yml -e fivin_ssh_public_key="ssh-ed25519 AAAA... you@host"
 #
 # Deliberately separate from site.yml/vars/profiles.yml: different
 # devices may end up wanting different admin-user setups, and user

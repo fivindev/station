@@ -13,7 +13,7 @@ provisioning.
 **Almost nothing here is meant to be run as root.** There are two separate
 playbooks:
 
-- `fivin.yml` — a standalone, one-time bootstrap: creates a sudo user
+- `users/fivin.yml` — a standalone, one-time bootstrap: creates a sudo user
   (`fivin`) with SSH-key-only login. Run once, as root (or whatever
   account you land on for a fresh device).
 - `site.yml` — everything else (dotfiles, packages, toolchains). Meant to
@@ -45,7 +45,7 @@ playbooks:
 4. Create the `fivin` user:
 
    ```
-   ansible-playbook fivin.yml -e fivin_ssh_public_key="ssh-ed25519 AAAA... you@host"
+   ansible-playbook users/fivin.yml -e fivin_ssh_public_key="ssh-ed25519 AAAA... you@host"
    ```
 
    `fivin_ssh_public_key` is required (the run fails loudly if it's
@@ -76,14 +76,14 @@ playbooks:
 
 ## Day-to-day commands
 
-Everything below (except `fivin.yml`/`fivin-uninstall.yml`) takes
+Everything below (except `users/fivin.yml`/`users/fivin-uninstall.yml`) takes
 `-e device_type=hermes-vps`, is meant to be run as `fivin`, and needs
 `-K` whenever it touches a `become: true` task (installing/removing
 packages).
 
 | Goal | Command |
 |---|---|
-| Create the admin user (once, as root) | `ansible-playbook fivin.yml -e fivin_ssh_public_key="..."` |
+| Create the admin user (once, as root) | `ansible-playbook users/fivin.yml -e fivin_ssh_public_key="..."` |
 | Install everything for this device | `ansible-playbook site.yml -e device_type=hermes-vps -K` |
 | Install just one role | `ansible-playbook site.yml -e device_type=hermes-vps --tags docker -K` |
 | Uninstall everything for this device | `ansible-playbook uninstall.yml -e device_type=hermes-vps -K` |
@@ -91,13 +91,14 @@ packages).
 | Reinstall a role (uninstall + install) | `ansible-playbook uninstall.yml -e device_type=hermes-vps --tags docker -K && ansible-playbook site.yml -e device_type=hermes-vps --tags docker -K` |
 | Dry-run (show what would change) | `ansible-playbook site.yml -e device_type=hermes-vps --check --diff` |
 | List available roles | `ansible-playbook site.yml --list-tags` |
-| Attempt to remove the admin user (fails loudly on purpose) | `ansible-playbook fivin-uninstall.yml` |
+| Attempt to remove the admin user (fails loudly on purpose) | `ansible-playbook users/fivin-uninstall.yml` |
 
 ## Repo structure
 
 ```
-fivin.yml               # standalone: creates the fivin admin user (run once, as root)
-fivin-uninstall.yml     # companion — fails loudly with manual removal steps
+users/
+  fivin.yml              # standalone: creates the fivin admin user (run once, as root)
+  fivin-uninstall.yml    # companion — fails loudly with manual removal steps
 site.yml                # install playbook — applies common + profiles[device_type] roles
 uninstall.yml           # same role selection, runs each role's uninstall.yml instead
 vars/profiles.yml       # device_type -> role list (edit this to add a role to a device)
@@ -133,9 +134,9 @@ Current roles (all under `site.yml`/`vars/profiles.yml`, run as `fivin`):
   literal placeholders from the source file; change them yourself if
   you're actually exposing the dashboard.
 
-`fivin` (used only by `fivin.yml`/`fivin-uninstall.yml`, not part of any
+`fivin` (used only by `users/fivin.yml`/`users/fivin-uninstall.yml`, not part of any
 `vars/profiles.yml` list): creates the sudo user described above.
-**Has no real uninstall** — `fivin-uninstall.yml` fails loudly with
+**Has no real uninstall** — `users/fivin-uninstall.yml` fails loudly with
 manual removal instructions instead, since deleting a live user account
 isn't something this repo automates.
 

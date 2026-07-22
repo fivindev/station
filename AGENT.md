@@ -4,7 +4,7 @@ This is a personal Ansible provisioning repo (see README.md for the
 full design). It currently manages one device type — `hermes-vps`, an
 Ubuntu VPS. Provisioning it is two stages, two separate playbooks:
 
-1. `fivin.yml`, run once as root, creates a sudo user (`fivin`) with
+1. `users/fivin.yml`, run once as root, creates a sudo user (`fivin`) with
    SSH-key-only login. Standalone on purpose — not a role inside
    `vars/profiles.yml` — because different devices may want different
    admin-user setups, and user creation is a one-time bootstrap step,
@@ -41,7 +41,7 @@ exist — e.g. keep OS-specific branching keyed on `ansible_facts`, not on
   rather than silently doing nothing: `roles/workspaces/tasks/uninstall.yml`
   is a deliberate no-op (the directory holds other roles' data by the
   time you'd remove it), and `roles/fivin/tasks/uninstall.yml` (run via
-  `fivin-uninstall.yml`) fails loudly with manual instructions (deleting
+  `users/fivin-uninstall.yml`) fails loudly with manual instructions (deleting
   a live user account unattended was judged too destructive to
   automate). If you add a role where uninstall genuinely can't or
   shouldn't be automated, follow one of those two patterns rather than
@@ -83,9 +83,13 @@ exist — e.g. keep OS-specific branching keyed on `ansible_facts`, not on
   `site.yml`/`uninstall.yml`. Those two playbooks read the role list
   for a device_type dynamically; they should almost never need to
   change. `roles/fivin` is the one deliberate exception — it's invoked
-  directly from `fivin.yml`/`fivin-uninstall.yml`, not from
+  directly from `users/fivin.yml`/`users/fivin-uninstall.yml`, not from
   `vars/profiles.yml`, because user creation is a one-time bootstrap
-  step for a device, not a repeatable part of its role list.
+  step for a device, not a repeatable part of its role list. If another
+  device needs its own admin-user setup later, its playbook(s) belong in
+  `users/` too (e.g. `users/<name>.yml`) — that directory is reserved
+  for this category of standalone, one-time bootstrap playbook, distinct
+  from `site.yml`/`uninstall.yml` at the repo root.
 - **Reference the invoking user's home as `{{ home_dir }}`**, a var
   defined once in `site.yml`/`uninstall.yml` (`ansible_facts['env']['HOME']`),
   not the deprecated bare `ansible_env.HOME` shortcut. Same goes for any
