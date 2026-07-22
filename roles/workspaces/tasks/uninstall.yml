@@ -1,0 +1,8 @@
+---
+# Deliberately not removing ~/workspaces here: by the time you'd
+# uninstall this role, it's likely holding real projects and other
+# roles' data (e.g. roles/hermes deploys into ~/workspaces/hermes), not
+# just something this role exclusively owns. Nothing to safely reverse.
+- name: No-op — ~/workspaces is left in place
+  ansible.builtin.debug:
+    msg: "workspaces role has nothing to uninstall; ~/workspaces is left as-is since it likely holds real data by now."

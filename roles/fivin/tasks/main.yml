@@ -1,0 +1,55 @@
+---
+- name: Require fivin_ssh_public_key
+  ansible.builtin.fail:
+    msg: >-
+      Pass -e fivin_ssh_public_key="ssh-ed25519 AAAA... you@host"
+      (see roles/fivin/defaults/main.yml)
+  when: not fivin_ssh_public_key
+
+- name: Create sudo user fivin
+  become: true
+  block:
+    - name: Prompt for fivin's password (used for sudo only — SSH login is key-only)
+      ansible.builtin.pause:
+        prompt: "Enter a password for the fivin user (used for sudo; SSH login is key-only)"
+        echo: false
+      register: fivin_password_prompt
+      no_log: true
+
+    - name: Create fivin user
+      ansible.builtin.user:
+        name: fivin
+        password: "{{ fivin_password_prompt.user_input | password_hash('sha512') }}"
+        groups: sudo
+        append: true
+        shell: /bin/bash
+        create_home: true
+      no_log: true
+
+    - name: Check for docker group
+      ansible.builtin.getent:
+        database: group
+        key: docker
+        fail_key: false
+
+    - name: Add fivin to docker group, if present
+      ansible.builtin.user:
+        name: fivin
+        groups: docker
+        append: true
+      when: "'docker' in ansible_facts.getent_group"
+
+    - name: Install fivin's SSH public key
+      ansible.builtin.authorized_key:
+        user: fivin
+        key: "{{ fivin_ssh_public_key }}"
+        state: present
+
+    - name: Disable SSH password authentication for fivin
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/fivin-no-password.conf
+        content: |
+          Match User fivin
+              PasswordAuthentication no
+        mode: "0644"
+      notify: Reload sshd

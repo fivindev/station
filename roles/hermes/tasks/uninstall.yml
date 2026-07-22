@@ -1,0 +1,19 @@
+---
+- name: Remove docker-compose.yaml
+  ansible.builtin.file:
+    path: "{{ hermes_dir }}/docker-compose.yaml"
+    state: absent
+
+- name: Remove .env
+  ansible.builtin.file:
+    path: "{{ hermes_dir }}/.env"
+    state: absent
+
+- name: Remove generated basic-auth secret file
+  ansible.builtin.file:
+    path: "{{ hermes_dir }}/.basic_auth_secret"
+    state: absent
+
+# Not removed: ~/.hermes (the container's data volume, if you've actually
+# run `docker compose up -d`) and hermes_dir itself — both may hold real
+# data this role didn't create.

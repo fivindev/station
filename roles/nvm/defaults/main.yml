@@ -1,0 +1,6 @@
+---
+# nvm's own README instructs installing via a version-pinned curl|bash
+# command — there's no "always latest" URL, you're expected to bump the
+# version yourself when a new nvm release comes out. Check
+# https://github.com/nvm-sh/nvm/releases for the current tag.
+nvm_version: v0.40.1

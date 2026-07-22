@@ -1,0 +1,5 @@
+---
+# Role dependencies go here, e.g.:
+# dependencies:
+#   - role: some-other-role
+dependencies: []

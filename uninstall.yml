@@ -1,0 +1,20 @@
+---
+- name: Remove provisioned items from this device
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars_files:
+    - vars/profiles.yml
+
+  tasks:
+    - name: Require device_type
+      ansible.builtin.fail:
+        msg: "Pass -e device_type=<hermes-vps> (see vars/profiles.yml)"
+      when: device_type is not defined or device_type not in profiles
+
+    - name: Uninstall role
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: uninstall.yml
+      loop: "{{ profiles['common'] + profiles[device_type] }}"
+      tags: "{{ item }}"

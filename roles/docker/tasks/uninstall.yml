@@ -1,0 +1,40 @@
+---
+- name: Remove Docker Engine
+  become: true
+  block:
+    - name: Stop and disable docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: stopped
+        enabled: false
+      failed_when: false
+
+    - name: Remove Docker packages
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: absent
+        purge: true
+
+    - name: Remove Docker's apt repository file
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/docker.list
+        state: absent
+
+    - name: Remove Docker's apt keyring
+      ansible.builtin.file:
+        path: /etc/apt/keyrings/docker.asc
+        state: absent
+
+    - name: Update apt cache after removing Docker's repo
+      ansible.builtin.apt:
+        update_cache: true
+
+# Note: this does NOT remove /var/lib/docker or /var/lib/containerd
+# (existing images, containers, volumes) — same caveat Docker's own
+# uninstall docs give. Delete those yourself for a full wipe:
+#   sudo rm -rf /var/lib/docker /var/lib/containerd

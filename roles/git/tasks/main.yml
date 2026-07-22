@@ -1,0 +1,27 @@
+---
+- name: Install git
+  ansible.builtin.package:
+    name: git
+    state: present
+  become: true
+
+- name: Check current state of ~/.gitconfig
+  ansible.builtin.stat:
+    path: "{{ ansible_env.HOME }}/.gitconfig"
+  register: gitconfig_stat
+
+- name: Back up existing ~/.gitconfig
+  ansible.builtin.command:
+    cmd: >
+      mv {{ ansible_env.HOME }}/.gitconfig
+      {{ ansible_env.HOME }}/.gitconfig.bak.{{ ansible_date_time.iso8601_basic_short }}
+  when:
+    - gitconfig_stat.stat.exists
+    - not gitconfig_stat.stat.islnk
+
+- name: Symlink gitconfig into place
+  ansible.builtin.file:
+    src: "{{ role_path }}/files/gitconfig"
+    dest: "{{ ansible_env.HOME }}/.gitconfig"
+    state: link
+    force: false

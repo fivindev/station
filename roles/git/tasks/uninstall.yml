@@ -1,0 +1,11 @@
+---
+- name: Remove gitconfig symlink
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/.gitconfig"
+    state: absent
+
+- name: Remove git package
+  ansible.builtin.package:
+    name: git
+    state: absent
+  become: true

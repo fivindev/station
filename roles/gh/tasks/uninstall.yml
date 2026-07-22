@@ -1,0 +1,30 @@
+---
+- name: Uninstall GitHub CLI (Debian/Ubuntu)
+  when: ansible_facts['os_family'] == "Debian"
+  become: true
+  block:
+    - name: Remove gh package
+      ansible.builtin.apt:
+        name: gh
+        state: absent
+        purge: true
+
+    - name: Remove GitHub CLI's apt repository file
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/github-cli.list
+        state: absent
+
+    - name: Remove GitHub CLI's apt keyring
+      ansible.builtin.file:
+        path: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+        state: absent
+
+    - name: Update apt cache after removing GitHub CLI's repo
+      ansible.builtin.apt:
+        update_cache: true
+
+- name: Uninstall GitHub CLI (macOS)
+  ansible.builtin.package:
+    name: gh
+    state: absent
+  when: ansible_facts['system'] == "Darwin"

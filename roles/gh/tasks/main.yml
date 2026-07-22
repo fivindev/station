@@ -1,0 +1,54 @@
+---
+# GitHub's own install docs recommend adding their apt repository on
+# Debian/Ubuntu (the distro-packaged `gh`, where it exists at all, can be
+# missing or outdated) and Homebrew on macOS. See:
+# https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+# https://github.com/cli/cli#installation
+
+- name: Install GitHub CLI (Debian/Ubuntu)
+  when: ansible_facts['os_family'] == "Debian"
+  become: true
+  block:
+    - name: Install prerequisites for GitHub CLI's apt repository
+      ansible.builtin.apt:
+        name: curl
+        state: present
+        update_cache: true
+
+    - name: Create apt keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download GitHub CLI's official GPG keyring
+      ansible.builtin.get_url:
+        url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+        dest: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+        mode: "0644"
+        force: false
+
+    - name: Get dpkg architecture
+      ansible.builtin.command: dpkg --print-architecture
+      register: dpkg_arch
+      changed_when: false
+
+    - name: Add GitHub CLI's apt repository
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch={{ dpkg_arch.stdout }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg]
+          https://cli.github.com/packages stable main
+        filename: github-cli
+        state: present
+        update_cache: true
+
+    - name: Install gh
+      ansible.builtin.apt:
+        name: gh
+        state: present
+
+- name: Install GitHub CLI (macOS)
+  ansible.builtin.package:
+    name: gh
+    state: present
+  when: ansible_facts['system'] == "Darwin"

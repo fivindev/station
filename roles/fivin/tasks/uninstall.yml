@@ -1,0 +1,9 @@
+---
+- name: Refuse to auto-remove the fivin user
+  ansible.builtin.fail:
+    msg: >-
+      Uninstalling fivin is not automated — removing a real user
+      account unattended is too destructive. To remove it yourself:
+      sudo userdel fivin (add -r to also delete /home/fivin), then
+      delete /etc/ssh/sshd_config.d/fivin-no-password.conf and reload
+      sshd (sudo systemctl reload ssh).

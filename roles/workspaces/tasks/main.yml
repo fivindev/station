@@ -1,0 +1,6 @@
+---
+- name: Ensure ~/workspaces exists
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/workspaces"
+    state: directory
+    mode: "0755"

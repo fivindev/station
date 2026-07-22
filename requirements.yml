@@ -1,0 +1,5 @@
+---
+# Ansible collections required by roles/*. Nothing currently in use —
+# all roles rely on ansible.builtin modules only. Add entries here if a
+# future role needs one (e.g. community.general for dconf).
+collections: []

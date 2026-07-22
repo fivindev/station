@@ -1,0 +1,9 @@
+---
+- name: Install bun
+  ansible.builtin.shell: curl -fsSL https://bun.sh/install | bash
+  args:
+    creates: "{{ ansible_env.HOME }}/.bun/bin/bun"
+    executable: /bin/bash
+
+# bun's installer already appends BUN_INSTALL/PATH lines to the right
+# shell profile — no separate Ansible task needed for that part.

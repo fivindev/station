@@ -1,0 +1,4 @@
+*.retry
+*.bak.*
+.DS_Store
+.claude/

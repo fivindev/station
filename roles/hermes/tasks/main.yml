@@ -1,0 +1,32 @@
+---
+# Deploys docker-compose.yaml for the hermes stack. Deliberately does
+# NOT run `docker compose up -d` — this role only ensures the file (and
+# its .env) are in place; starting it is a manual step.
+
+- name: Ensure hermes workspace directory exists
+  ansible.builtin.file:
+    path: "{{ hermes_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Deploy docker-compose.yaml
+  ansible.builtin.copy:
+    src: docker-compose.yaml
+    dest: "{{ hermes_dir }}/docker-compose.yaml"
+    mode: "0644"
+
+# Generated once and persisted to a dotfile next to the compose file, so
+# re-running this role doesn't rotate the secret out from under an
+# already-running stack. Never committed to git — it only ever exists on
+# the provisioned machine itself.
+- name: Generate (or reuse) the dashboard basic-auth secret
+  ansible.builtin.set_fact:
+    hermes_basic_auth_secret: "{{ lookup('ansible.builtin.password', hermes_dir ~ '/.basic_auth_secret length=64 chars=hexdigits') }}"
+  no_log: true
+
+- name: Deploy .env with the generated secret
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ hermes_dir }}/.env"
+    mode: "0600"
+  no_log: true

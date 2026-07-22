@@ -1,0 +1,5 @@
+---
+# Must be passed at runtime, e.g.:
+#   ansible-playbook site.yml -e device_type=hermes-vps \
+#     -e fivin_ssh_public_key="ssh-ed25519 AAAA... you@host"
+fivin_ssh_public_key: ""

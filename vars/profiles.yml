@@ -1,0 +1,23 @@
+---
+# Maps a device_type (passed via -e device_type=<name>) to the list of
+# roles that apply to it. `common` always applies, on top of whichever
+# device_type-specific list is selected.
+#
+# To add a new device type: add a key here, then run with
+# -e device_type=<key>.
+#
+# Role order within a list matters here: it's also execution order.
+# `fivin` must come after `docker` — it checks whether the docker group
+# already exists so it can conditionally join it.
+profiles:
+  common:
+    - git
+    - gh
+    - workspaces
+
+  hermes-vps:
+    - docker
+    - nvm
+    - bun
+    - hermes
+    - fivin
