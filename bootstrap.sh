@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # One-time setup: installs uv, then installs Ansible (via uv) and the
-# collections this repo's roles depend on. Run once per fresh device,
-# after cloning this repo, before any ansible-playbook command.
+# collections this repo's roles depend on. Run once PER USER (uv tool
+# installs are per-user, not system-wide) — typically as fivin, since
+# fivin should already exist by now (see users/fivin.sh) and everything
+# in this repo other than that script is meant to run as fivin, not root.
 set -euo pipefail
 
 if ! command -v uv >/dev/null 2>&1; then
@@ -16,11 +18,9 @@ echo "==> installing ansible via uv"
 # script) — ansible-playbook/ansible-galaxy/etc. belong to ansible-core,
 # which `ansible` merely depends on, so `uv tool install ansible` alone
 # leaves them missing. Installing ansible-core as the tool exposes the
-# real CLI; `--with ansible` still pulls in the full collection bundle,
-# and passlib is required for the password_hash filter (used by
-# roles/fivin).
+# real CLI; `--with ansible` still pulls in the full collection bundle.
 uv tool uninstall ansible >/dev/null 2>&1 || true # clean up a stale install from before this fix
-uv tool install ansible-core --with ansible --with passlib
+uv tool install ansible-core --with ansible
 
 # Makes sure ~/.local/bin is on PATH in your shell rc file going forward.
 # Safe to run every time — it's a no-op if already wired up.
@@ -41,5 +41,5 @@ ansible-playbook, either open a new terminal / reconnect, or run:
 
 Then, e.g.:
 
-  ansible-playbook site.yml -e device_type=hermes-vps
+  ansible-playbook site.yml -e device_type=hermes-vps -K
 EOF

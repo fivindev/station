@@ -10,18 +10,24 @@ Everything runs against `localhost` (`connection: local`) — no inventory
 file, no SSH, no remote control. You always run it *on* the device you're
 provisioning.
 
-**Almost nothing here is meant to be run as root.** There are two separate
-playbooks:
+**Almost nothing here is meant to be run as root.** Provisioning a
+device is two stages:
 
-- `users/fivin.yml` — a standalone, one-time bootstrap: creates a sudo user
-  (`fivin`) with SSH-key-only login. Run once, as root (or whatever
-  account you land on for a fresh device).
+- `users/fivin.sh` — a standalone, one-time bootstrap script (plain
+  bash, not Ansible — see why below): creates a sudo user (`fivin`)
+  with SSH-key-only login. Run once, as root (or whatever account you
+  land on for a fresh device).
 - `site.yml` — everything else (dotfiles, packages, toolchains). Meant to
-  be run **as `fivin`**, after switching to that user — not as root. This
-  is deliberately a separate playbook rather than a role in `site.yml`'s
-  list, since different devices may end up wanting different admin-user
-  setups, and user creation is a one-time bootstrap step, not part of a
-  repeatable per-device role list.
+  be run **as `fivin`**, after switching to that user — not as root.
+
+`fivin.sh` is plain bash rather than an Ansible playbook because
+`fivin` needs to exist *before* Ansible/uv are installed at all — this
+repo's whole Ansible setup (`bootstrap.sh`, `site.yml`) is meant to run
+as `fivin`, not root, so bootstrapping that user can't itself depend on
+Ansible being present yet. It's also deliberately a standalone script
+rather than a role in `site.yml`'s list, since different devices may
+end up wanting different admin-user setups, and user creation is a
+one-time bootstrap step, not part of a repeatable per-device role list.
 
 ## Fresh machine setup
 
@@ -29,8 +35,29 @@ playbooks:
 
 1. Install git manually (`apt install git` / already present on macOS).
 2. Clone this repo.
-3. Run the bootstrap script once (installs [uv](https://docs.astral.sh/uv/),
-   then Ansible via uv, then this repo's required Ansible collections):
+3. Create the `fivin` user:
+
+   ```
+   sudo ./users/fivin.sh "ssh-ed25519 AAAA... you@host"
+   ```
+
+   The SSH public key is required as an argument (the script refuses to
+   run without one — never store it in this repo). You'll be
+   interactively prompted for a password for `fivin` (used for `sudo`
+   only — SSH login for `fivin` is key-only; password auth over SSH is
+   disabled specifically for this user via an sshd `Match User` block).
+
+**Stage 2 — switch to `fivin`, provision everything else:**
+
+4. Reconnect as `fivin` (`ssh fivin@this-host`, or `su - fivin` if
+   you're still on the box).
+5. Clone this repo again (into `fivin`'s own home — a separate copy from
+   root's, since `fivin` needs its own working copy to actually run
+   things).
+6. Run the bootstrap script once (installs [uv](https://docs.astral.sh/uv/),
+   then Ansible via uv, then this repo's required Ansible collections —
+   `uv tool install` is per-user, so this has to happen again here even
+   if root already ran it):
 
    ```
    ./bootstrap.sh
@@ -42,26 +69,6 @@ playbooks:
    `source ~/.bashrc`, before the next step. If you skip this you'll
    see `ansible-playbook: command not found`.
 
-4. Create the `fivin` user:
-
-   ```
-   ansible-playbook users/fivin.yml -e fivin_ssh_public_key="ssh-ed25519 AAAA... you@host"
-   ```
-
-   `fivin_ssh_public_key` is required (the run fails loudly if it's
-   missing — never store it in this repo). You'll be interactively
-   prompted for a password for `fivin` (used for `sudo` only — SSH login
-   for `fivin` is key-only; password auth over SSH is disabled
-   specifically for this user via an sshd `Match User` block).
-
-**Stage 2 — switch to `fivin`, provision everything else:**
-
-5. Reconnect as `fivin` (`ssh fivin@this-host`, or `su - fivin` if
-   you're still on the box).
-6. Clone this repo again (into `fivin`'s own home — a separate copy from
-   root's, since `fivin` needs its own working copy to actually run
-   things), and run `./bootstrap.sh` again — `uv tool install` is
-   per-user, so `fivin` needs their own Ansible install too.
 7. Run the playbook, telling it what kind of device this is:
 
    ```
@@ -76,14 +83,13 @@ playbooks:
 
 ## Day-to-day commands
 
-Everything below (except `users/fivin.yml`/`users/fivin-uninstall.yml`) takes
-`-e device_type=hermes-vps`, is meant to be run as `fivin`, and needs
-`-K` whenever it touches a `become: true` task (installing/removing
-packages).
+Everything below except `users/fivin.sh` takes `-e device_type=hermes-vps`,
+is meant to be run as `fivin`, and needs `-K` whenever it touches a
+`become: true` task (installing/removing packages).
 
 | Goal | Command |
 |---|---|
-| Create the admin user (once, as root) | `ansible-playbook users/fivin.yml -e fivin_ssh_public_key="..."` |
+| Create the admin user (once, as root) | `sudo ./users/fivin.sh "ssh-ed25519 AAAA..."` |
 | Install everything for this device | `ansible-playbook site.yml -e device_type=hermes-vps -K` |
 | Install just one role | `ansible-playbook site.yml -e device_type=hermes-vps --tags docker -K` |
 | Uninstall everything for this device | `ansible-playbook uninstall.yml -e device_type=hermes-vps -K` |
@@ -91,14 +97,15 @@ packages).
 | Reinstall a role (uninstall + install) | `ansible-playbook uninstall.yml -e device_type=hermes-vps --tags docker -K && ansible-playbook site.yml -e device_type=hermes-vps --tags docker -K` |
 | Dry-run (show what would change) | `ansible-playbook site.yml -e device_type=hermes-vps --check --diff` |
 | List available roles | `ansible-playbook site.yml --list-tags` |
-| Attempt to remove the admin user (fails loudly on purpose) | `ansible-playbook users/fivin-uninstall.yml` |
+
+To remove the `fivin` user, do it manually (see below) — there's no
+uninstall script for it.
 
 ## Repo structure
 
 ```
 users/
-  fivin.yml              # standalone: creates the fivin admin user (run once, as root)
-  fivin-uninstall.yml    # companion — fails loudly with manual removal steps
+  fivin.sh               # standalone: creates the fivin admin user (run once, as root, before Ansible)
 site.yml                # install playbook — applies common + profiles[device_type] roles
 uninstall.yml           # same role selection, runs each role's uninstall.yml instead
 vars/profiles.yml       # device_type -> role list (edit this to add a role to a device)
@@ -134,11 +141,16 @@ Current roles (all under `site.yml`/`vars/profiles.yml`, run as `fivin`):
   literal placeholders from the source file; change them yourself if
   you're actually exposing the dashboard.
 
-`fivin` (used only by `users/fivin.yml`/`users/fivin-uninstall.yml`, not part of any
-`vars/profiles.yml` list): creates the sudo user described above.
-**Has no real uninstall** — `users/fivin-uninstall.yml` fails loudly with
-manual removal instructions instead, since deleting a live user account
-isn't something this repo automates.
+`fivin` (created by `users/fivin.sh`, a plain script — not an Ansible
+role, not part of any `vars/profiles.yml` list) is the sudo user
+described above. **There's no uninstall for it** — deleting a live user
+account isn't something this repo automates. To remove it yourself:
+
+```
+sudo userdel fivin        # add -r to also delete /home/fivin
+sudo rm -f /etc/ssh/sshd_config.d/fivin-no-password.conf
+sudo systemctl reload ssh
+```
 
 ## Adding something new
 

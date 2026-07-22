@@ -2,13 +2,17 @@
 
 This is a personal Ansible provisioning repo (see README.md for the
 full design). It currently manages one device type — `hermes-vps`, an
-Ubuntu VPS. Provisioning it is two stages, two separate playbooks:
+Ubuntu VPS. Provisioning it is two stages:
 
-1. `users/fivin.yml`, run once as root, creates a sudo user (`fivin`) with
-   SSH-key-only login. Standalone on purpose — not a role inside
-   `vars/profiles.yml` — because different devices may want different
-   admin-user setups, and user creation is a one-time bootstrap step,
-   not part of the repeatable per-device role list.
+1. `users/fivin.sh` — plain bash, NOT Ansible — run once as root,
+   creates a sudo user (`fivin`) with SSH-key-only login. It has to be
+   plain bash rather than a playbook: `fivin` must exist *before*
+   Ansible/uv are installed at all, since `bootstrap.sh`/`site.yml` are
+   themselves meant to run as `fivin`, not root. Standalone for a
+   second reason too — different devices may want different admin-user
+   setups, and user creation is a one-time bootstrap step, not part of
+   the repeatable per-device role list. Don't try to fold this back
+   into an Ansible role/playbook.
 2. `site.yml -e device_type=hermes-vps`, run as `fivin` (not root) after
    switching users, does everything else (dotfiles, packages,
    toolchains).
@@ -18,7 +22,7 @@ Because `site.yml` is invoked BY `fivin` themselves (not by root using
 naturally resolve to `fivin`'s own context with no special-casing
 anywhere in the git/gh/workspaces/docker/nvm/bun/hermes roles. Don't
 reintroduce `become_user`-switching logic to simulate "run as a specific
-user" — the two-playbook split already gets you that, more simply.
+user" — the two-stage split already gets you that, more simply.
 
 The design supports multiple device types sharing roles via
 `vars/profiles.yml` (a macOS laptop, a Raspberry Pi, etc. were
@@ -37,22 +41,24 @@ exist — e.g. keep OS-specific branching keyed on `ansible_facts`, not on
   each install step with an explicit removal step (package `state:
   absent`, symlink `state: absent`, removing a vendor install directory
   like `~/.nvm`/`~/.bun`, stripping shell-profile lines the installer
-  added, etc.). Two narrow exceptions exist, and both say so explicitly
-  rather than silently doing nothing: `roles/workspaces/tasks/uninstall.yml`
-  is a deliberate no-op (the directory holds other roles' data by the
-  time you'd remove it), and `roles/fivin/tasks/uninstall.yml` (run via
-  `users/fivin-uninstall.yml`) fails loudly with manual instructions (deleting
-  a live user account unattended was judged too destructive to
-  automate). If you add a role where uninstall genuinely can't or
-  shouldn't be automated, follow one of those two patterns rather than
-  leaving uninstall.yml empty or silently skipping it.
+  added, etc.). `roles/workspaces/tasks/uninstall.yml` is a deliberate
+  exception — a no-op that says so explicitly (the directory holds
+  other roles' data by the time you'd remove it) rather than silently
+  doing nothing. If you add a role where uninstall genuinely can't or
+  shouldn't be automated, follow that pattern (an explicit, explained
+  no-op) rather than leaving uninstall.yml empty or silently skipping
+  it. `users/fivin.sh` (outside the role system entirely) has no
+  uninstall counterpart at all — deleting a live user account was
+  judged too risky to script even as a "fails loudly" stub; README.md
+  documents the manual removal steps instead. Don't add one back
+  without being asked.
 - **Root privileges are opt-in, not the default.** Neither `site.yml`
   nor `uninstall.yml` sets `become` at the play level. Any task that
   installs packages, writes outside `$HOME` (`/etc/...`), manages a
   systemd service, or manages user accounts/groups needs `become: true`
   set explicitly — either on the task itself, or on a wrapping `block:`
   when several tasks in a row all need it (see `roles/docker`,
-  `roles/gh`, `roles/fivin`). Tasks that only touch files inside the
+  `roles/gh`). Tasks that only touch files inside the
   invoking user's own `$HOME` (dotfiles, `~/workspaces/...`) must NOT
   set `become` — under `become: true` they'd create root-owned files in
   the user's home directory instead of user-owned ones. When adding a
@@ -82,14 +88,13 @@ exist — e.g. keep OS-specific branching keyed on `ansible_facts`, not on
 - **New roles are registered in `vars/profiles.yml`**, not by editing
   `site.yml`/`uninstall.yml`. Those two playbooks read the role list
   for a device_type dynamically; they should almost never need to
-  change. `roles/fivin` is the one deliberate exception — it's invoked
-  directly from `users/fivin.yml`/`users/fivin-uninstall.yml`, not from
-  `vars/profiles.yml`, because user creation is a one-time bootstrap
-  step for a device, not a repeatable part of its role list. If another
-  device needs its own admin-user setup later, its playbook(s) belong in
-  `users/` too (e.g. `users/<name>.yml`) — that directory is reserved
-  for this category of standalone, one-time bootstrap playbook, distinct
-  from `site.yml`/`uninstall.yml` at the repo root.
+  change. Admin-user creation (`users/fivin.sh`) is a deliberate
+  exception, and lives entirely outside the role system — it's not an
+  Ansible role at all (see the top of this file for why). If another
+  device needs its own admin-user setup later, its script(s) belong in
+  `users/` too (e.g. `users/<name>.sh`) — that directory is reserved for
+  this category of standalone, one-time, pre-Ansible bootstrap script,
+  distinct from `site.yml`/`uninstall.yml` and `roles/` at the repo root.
 - **Reference the invoking user's home as `{{ home_dir }}`**, a var
   defined once in `site.yml`/`uninstall.yml` (`ansible_facts['env']['HOME']`),
   not the deprecated bare `ansible_env.HOME` shortcut. Same goes for any
