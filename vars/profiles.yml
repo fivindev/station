@@ -6,9 +6,11 @@
 # To add a new device type: add a key here, then run with
 # -e device_type=<key>.
 #
-# Role order within a list matters here: it's also execution order.
-# `fivin` must come after `docker` — it checks whether the docker group
-# already exists so it can conditionally join it.
+# NOTE: creating a device's admin user (e.g. fivin, for hermes-vps) is
+# NOT part of this list — that's a separate, standalone playbook (see
+# fivin.yml) run once as root, before site.yml is ever run. site.yml
+# itself is meant to be run AS that admin user, not as root — see
+# README.md.
 profiles:
   common:
     - git
@@ -20,4 +22,3 @@ profiles:
     - nvm
     - bun
     - hermes
-    - fivin

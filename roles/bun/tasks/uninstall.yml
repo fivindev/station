@@ -1,7 +1,7 @@
 ---
 - name: Remove bun install directory
   ansible.builtin.file:
-    path: "{{ ansible_env.HOME }}/.bun"
+    path: "{{ home_dir }}/.bun"
     state: absent
 
 - name: Check for shell profile files
@@ -9,9 +9,9 @@
     path: "{{ item }}"
   register: bun_profile_stat
   loop:
-    - "{{ ansible_env.HOME }}/.bashrc"
-    - "{{ ansible_env.HOME }}/.zshrc"
-    - "{{ ansible_env.HOME }}/.profile"
+    - "{{ home_dir }}/.bashrc"
+    - "{{ home_dir }}/.zshrc"
+    - "{{ home_dir }}/.profile"
 
 - name: Remove bun lines from shell profiles
   ansible.builtin.lineinfile:

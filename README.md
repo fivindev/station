@@ -1,7 +1,7 @@
 # station
 
-Personal provisioning repo. One Ansible playbook, run locally on whichever
-device you're setting up, that installs dotfiles, packages, toolchains, and
+Personal provisioning repo. Ansible playbooks, run locally on whichever
+device you're setting up, that install dotfiles, packages, toolchains, and
 OS/desktop settings. Currently covers one device type — `hermes-vps`, an
 Ubuntu VPS — but is built to have more device types (a macOS laptop, a
 Raspberry Pi, etc.) added back in later without restructuring anything.
@@ -10,7 +10,22 @@ Everything runs against `localhost` (`connection: local`) — no inventory
 file, no SSH, no remote control. You always run it *on* the device you're
 provisioning.
 
+**Almost nothing here is meant to be run as root.** There are two separate
+playbooks:
+
+- `fivin.yml` — a standalone, one-time bootstrap: creates a sudo user
+  (`fivin`) with SSH-key-only login. Run once, as root (or whatever
+  account you land on for a fresh device).
+- `site.yml` — everything else (dotfiles, packages, toolchains). Meant to
+  be run **as `fivin`**, after switching to that user — not as root. This
+  is deliberately a separate playbook rather than a role in `site.yml`'s
+  list, since different devices may end up wanting different admin-user
+  setups, and user creation is a one-time bootstrap step, not part of a
+  repeatable per-device role list.
+
 ## Fresh machine setup
+
+**Stage 1 — as root, create the admin user:**
 
 1. Install git manually (`apt install git` / already present on macOS).
 2. Clone this repo.
@@ -27,49 +42,75 @@ provisioning.
    `source ~/.bashrc`, before the next step. If you skip this you'll
    see `ansible-playbook: command not found`.
 
-4. Run the playbook, telling it what kind of device this is:
+4. Create the `fivin` user:
 
    ```
-   ansible-playbook site.yml -e device_type=hermes-vps \
-     -e fivin_ssh_public_key="ssh-ed25519 AAAA... you@host"
+   ansible-playbook fivin.yml -e fivin_ssh_public_key="ssh-ed25519 AAAA... you@host"
+   ```
+
+   `fivin_ssh_public_key` is required (the run fails loudly if it's
+   missing — never store it in this repo). You'll be interactively
+   prompted for a password for `fivin` (used for `sudo` only — SSH login
+   for `fivin` is key-only; password auth over SSH is disabled
+   specifically for this user via an sshd `Match User` block).
+
+**Stage 2 — switch to `fivin`, provision everything else:**
+
+5. Reconnect as `fivin` (`ssh fivin@this-host`, or `su - fivin` if
+   you're still on the box).
+6. Clone this repo again (into `fivin`'s own home — a separate copy from
+   root's, since `fivin` needs its own working copy to actually run
+   things), and run `./bootstrap.sh` again — `uv tool install` is
+   per-user, so `fivin` needs their own Ansible install too.
+7. Run the playbook, telling it what kind of device this is:
+
+   ```
+   ansible-playbook site.yml -e device_type=hermes-vps -K
    ```
 
    `device_type` must be one of the keys in `vars/profiles.yml`
-   (currently just `hermes-vps`). On `hermes-vps`, `fivin_ssh_public_key`
-   is required (the run fails loudly if it's missing), and you'll be
-   interactively prompted for a password for the `fivin` sudo user
-   (used for `sudo` only — SSH login for `fivin` is key-only).
+   (currently just `hermes-vps`). `-K` (`--ask-become-pass`) is needed
+   because `fivin` has no passwordless sudo — pass it whenever a task
+   needs `become: true` (installing packages, mainly); Ansible prompts
+   once and reuses it for every such task in the run.
 
 ## Day-to-day commands
 
-Everything below takes `-e device_type=hermes-vps`.
+Everything below (except `fivin.yml`/`fivin-uninstall.yml`) takes
+`-e device_type=hermes-vps`, is meant to be run as `fivin`, and needs
+`-K` whenever it touches a `become: true` task (installing/removing
+packages).
 
 | Goal | Command |
 |---|---|
-| Install everything for this device | `ansible-playbook site.yml -e device_type=hermes-vps` |
-| Install just one role | `ansible-playbook site.yml -e device_type=hermes-vps --tags docker` |
-| Uninstall everything for this device | `ansible-playbook uninstall.yml -e device_type=hermes-vps` (stops at `fivin` — see below) |
-| Uninstall just one role | `ansible-playbook uninstall.yml -e device_type=hermes-vps --tags docker` |
-| Reinstall a role (uninstall + install) | `ansible-playbook uninstall.yml -e device_type=hermes-vps --tags docker && ansible-playbook site.yml -e device_type=hermes-vps --tags docker` |
+| Create the admin user (once, as root) | `ansible-playbook fivin.yml -e fivin_ssh_public_key="..."` |
+| Install everything for this device | `ansible-playbook site.yml -e device_type=hermes-vps -K` |
+| Install just one role | `ansible-playbook site.yml -e device_type=hermes-vps --tags docker -K` |
+| Uninstall everything for this device | `ansible-playbook uninstall.yml -e device_type=hermes-vps -K` |
+| Uninstall just one role | `ansible-playbook uninstall.yml -e device_type=hermes-vps --tags docker -K` |
+| Reinstall a role (uninstall + install) | `ansible-playbook uninstall.yml -e device_type=hermes-vps --tags docker -K && ansible-playbook site.yml -e device_type=hermes-vps --tags docker -K` |
 | Dry-run (show what would change) | `ansible-playbook site.yml -e device_type=hermes-vps --check --diff` |
 | List available roles | `ansible-playbook site.yml --list-tags` |
+| Attempt to remove the admin user (fails loudly on purpose) | `ansible-playbook fivin-uninstall.yml` |
 
 ## Repo structure
 
 ```
-site.yml              # install playbook — applies common + profiles[device_type] roles
-uninstall.yml          # same role selection, runs each role's uninstall.yml instead
-vars/profiles.yml      # device_type -> role list (edit this to add a role to a device)
+fivin.yml               # standalone: creates the fivin admin user (run once, as root)
+fivin-uninstall.yml     # companion — fails loudly with manual removal steps
+site.yml                # install playbook — applies common + profiles[device_type] roles
+uninstall.yml           # same role selection, runs each role's uninstall.yml instead
+vars/profiles.yml       # device_type -> role list (edit this to add a role to a device)
 roles/<name>/
-  tasks/main.yml       # install steps
-  tasks/uninstall.yml  # removal steps (mirrors main.yml)
+  tasks/main.yml        # install steps
+  tasks/uninstall.yml   # removal steps (mirrors main.yml)
   meta/main.yml         # role dependencies, if any (Ansible resolves these automatically)
   files/, templates/    # dotfiles symlinked/rendered into $HOME
-bootstrap.sh           # one-time: installs uv, ansible, and collections
-requirements.yml       # ansible-galaxy collections this repo depends on (currently none)
+bootstrap.sh            # one-time per user: installs uv, ansible, and collections
+requirements.yml        # ansible-galaxy collections this repo depends on (currently none)
 ```
 
-Current roles:
+Current roles (all under `site.yml`/`vars/profiles.yml`, run as `fivin`):
 
 - `git` — under `common`, applies to every device type. Installs git,
   symlinks `~/.gitconfig`.
@@ -80,6 +121,8 @@ Current roles:
   tool's own recommended method (apt repository for Docker,
   version-pinned `curl | bash` installers for nvm/bun), not a generic
   package manager entry. `nvm` also installs the latest Node LTS.
+  `docker` adds whoever is running the playbook (`fivin`, once `fivin`
+  runs it) to the `docker` group.
 - `hermes` — under `hermes-vps`. Deploys `~/workspaces/hermes/docker-compose.yaml`
   plus a generated `.env`. The basic-auth secret is randomly generated on
   first run and persisted to `~/workspaces/hermes/.basic_auth_secret` (so
@@ -89,18 +132,12 @@ Current roles:
   The dashboard username/password (`admin`/`password`) are left as
   literal placeholders from the source file; change them yourself if
   you're actually exposing the dashboard.
-- `fivin` — under `hermes-vps`. Creates a sudo user `fivin`: SSH login is
-  key-only (the public key is a required `-e fivin_ssh_public_key=...`
-  at runtime — never stored in this repo), password login over SSH is
-  disabled specifically for this user via an sshd `Match User` block, but
-  a real password is set (prompted for interactively on each run) so
-  `sudo` still works normally. Joins the `docker` group only if it
-  already exists (order matters: `fivin` runs after `docker` in
-  `vars/profiles.yml`). **Has no real `uninstall.yml`** — it fails
-  loudly with manual removal instructions instead, since deleting a
-  live user account isn't something this repo automates. That means
-  "uninstall everything" on `hermes-vps` will stop when it reaches
-  `fivin`; add `--skip-tags fivin` to uninstall everything else.
+
+`fivin` (used only by `fivin.yml`/`fivin-uninstall.yml`, not part of any
+`vars/profiles.yml` list): creates the sudo user described above.
+**Has no real uninstall** — `fivin-uninstall.yml` fails loudly with
+manual removal instructions instead, since deleting a live user account
+isn't something this repo automates.
 
 ## Adding something new
 
@@ -110,8 +147,9 @@ Current roles:
    Homebrew, unless the tool's own docs recommend a different specific
    method (see `docker`/`nvm`/`bun` above) — follow that instead. Use
    `ansible.builtin.file` with `state: link` to symlink dotfiles from
-   the role's `files/` dir into `$HOME`; if something already exists at
-   the target path, back it up first rather than overwriting.
+   the role's `files/` dir into `$HOME` (referenced as `{{ home_dir }}`
+   — see below); if something already exists at the target path, back
+   it up first rather than overwriting.
 3. Add `<name>` to the relevant list(s) in `vars/profiles.yml` — put it
    under `common` if every device type should get it, or under a specific
    device type if not.
@@ -120,11 +158,15 @@ Current roles:
 5. Nothing runs as root by default. Tasks that install packages, write
    outside `$HOME`, manage services, or manage user accounts need
    `become: true` explicitly (on the task, or on a wrapping `block:` if
-   several tasks in a row need it — see `roles/docker`, `roles/gh`,
-   `roles/fivin`). Tasks that just touch files in the invoking user's
-   own `$HOME` (dotfiles, `~/workspaces/...`) should *not* set `become`,
-   or the files it creates end up root-owned instead of user-owned.
-6. Adding a new device type: add a key + role list to `vars/profiles.yml`,
+   several tasks in a row need it — see `roles/docker`, `roles/gh`).
+   Tasks that just touch files in the invoking user's own `$HOME`
+   (dotfiles, `~/workspaces/...`) should *not* set `become`, or the
+   files it creates end up root-owned instead of user-owned.
+6. Reference the invoking user's home directory as `{{ home_dir }}` (a
+   var defined once in `site.yml`/`uninstall.yml`, resolving to
+   `ansible_facts['env']['HOME']`) — not `ansible_env.HOME` directly,
+   which is a deprecated shortcut Ansible plans to remove.
+7. Adding a new device type: add a key + role list to `vars/profiles.yml`,
    then run with `-e device_type=<key>`.
 
 No changes to `site.yml`/`uninstall.yml` are needed to add a role or a

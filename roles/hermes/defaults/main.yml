@@ -1,2 +1,2 @@
 ---
-hermes_dir: "{{ ansible_env.HOME }}/workspaces/hermes"
+hermes_dir: "{{ home_dir }}/workspaces/hermes"

@@ -2,13 +2,30 @@
 
 This is a personal Ansible provisioning repo (see README.md for the
 full design). It currently manages one device type — `hermes-vps`, an
-Ubuntu VPS — run locally via `ansible-playbook site.yml -e
-device_type=hermes-vps`. The design supports multiple device types
-sharing roles via `vars/profiles.yml` (a macOS laptop, a Raspberry Pi,
-etc. were provisioned this way before and may come back later), so
-don't hardcode assumptions that `hermes-vps` is the only device_type
-that will ever exist — e.g. keep OS-specific branching keyed on
-`ansible_facts`, not on `device_type == "hermes-vps"`.
+Ubuntu VPS. Provisioning it is two stages, two separate playbooks:
+
+1. `fivin.yml`, run once as root, creates a sudo user (`fivin`) with
+   SSH-key-only login. Standalone on purpose — not a role inside
+   `vars/profiles.yml` — because different devices may want different
+   admin-user setups, and user creation is a one-time bootstrap step,
+   not part of the repeatable per-device role list.
+2. `site.yml -e device_type=hermes-vps`, run as `fivin` (not root) after
+   switching users, does everything else (dotfiles, packages,
+   toolchains).
+
+Because `site.yml` is invoked BY `fivin` themselves (not by root using
+`become_user` tricks), `ansible_facts['env']['HOME']` / `ansible_facts['user_id']`
+naturally resolve to `fivin`'s own context with no special-casing
+anywhere in the git/gh/workspaces/docker/nvm/bun/hermes roles. Don't
+reintroduce `become_user`-switching logic to simulate "run as a specific
+user" — the two-playbook split already gets you that, more simply.
+
+The design supports multiple device types sharing roles via
+`vars/profiles.yml` (a macOS laptop, a Raspberry Pi, etc. were
+provisioned this way before and may come back later), so don't hardcode
+assumptions that `hermes-vps` is the only device_type that will ever
+exist — e.g. keep OS-specific branching keyed on `ansible_facts`, not on
+`device_type == "hermes-vps"`.
 
 ## Conventions to follow when editing or adding roles
 
@@ -23,12 +40,12 @@ that will ever exist — e.g. keep OS-specific branching keyed on
   added, etc.). Two narrow exceptions exist, and both say so explicitly
   rather than silently doing nothing: `roles/workspaces/tasks/uninstall.yml`
   is a deliberate no-op (the directory holds other roles' data by the
-  time you'd remove it), and `roles/fivin/tasks/uninstall.yml` fails
-  loudly with manual instructions (deleting a live user account
-  unattended was judged too destructive to automate). If you add a role
-  where uninstall genuinely can't or shouldn't be automated, follow one
-  of those two patterns rather than leaving uninstall.yml empty or
-  silently skipping it.
+  time you'd remove it), and `roles/fivin/tasks/uninstall.yml` (run via
+  `fivin-uninstall.yml`) fails loudly with manual instructions (deleting
+  a live user account unattended was judged too destructive to
+  automate). If you add a role where uninstall genuinely can't or
+  shouldn't be automated, follow one of those two patterns rather than
+  leaving uninstall.yml empty or silently skipping it.
 - **Root privileges are opt-in, not the default.** Neither `site.yml`
   nor `uninstall.yml` sets `become` at the play level. Any task that
   installs packages, writes outside `$HOME` (`/etc/...`), manages a
@@ -65,7 +82,16 @@ that will ever exist — e.g. keep OS-specific branching keyed on
 - **New roles are registered in `vars/profiles.yml`**, not by editing
   `site.yml`/`uninstall.yml`. Those two playbooks read the role list
   for a device_type dynamically; they should almost never need to
-  change.
+  change. `roles/fivin` is the one deliberate exception — it's invoked
+  directly from `fivin.yml`/`fivin-uninstall.yml`, not from
+  `vars/profiles.yml`, because user creation is a one-time bootstrap
+  step for a device, not a repeatable part of its role list.
+- **Reference the invoking user's home as `{{ home_dir }}`**, a var
+  defined once in `site.yml`/`uninstall.yml` (`ansible_facts['env']['HOME']`),
+  not the deprecated bare `ansible_env.HOME` shortcut. Same goes for any
+  other fact: use `ansible_facts['x']`, never the bare `ansible_x` form
+  — `INJECT_FACTS_AS_VARS` (what makes the bare form work at all) is
+  deprecated and slated for removal in ansible-core 2.24.
 - **Tag propagation depends on `include_role` (dynamic), not
   `import_role` (static — it also doesn't support `loop` at all).**
   Don't "simplify" that to `import_role`.

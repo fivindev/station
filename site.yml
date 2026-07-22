@@ -5,6 +5,11 @@
   gather_facts: true
   vars_files:
     - vars/profiles.yml
+  vars:
+    # ansible_env.HOME (the bare top-level fact) is deprecated in favor
+    # of the ansible_facts[...] form; this is the invoking user's home
+    # (e.g. fivin's, once fivin runs this playbook — see fivin.yml).
+    home_dir: "{{ ansible_facts['env']['HOME'] }}"
 
   tasks:
     - name: Require device_type

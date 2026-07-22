@@ -5,6 +5,8 @@
   gather_facts: true
   vars_files:
     - vars/profiles.yml
+  vars:
+    home_dir: "{{ ansible_facts['env']['HOME'] }}"
 
   tasks:
     - name: Require device_type

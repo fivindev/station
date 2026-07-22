@@ -1,7 +1,7 @@
 ---
 - name: Remove nvm directory (also removes all Node versions installed via nvm)
   ansible.builtin.file:
-    path: "{{ ansible_env.HOME }}/.nvm"
+    path: "{{ home_dir }}/.nvm"
     state: absent
 
 - name: Check for shell profile files
@@ -9,9 +9,9 @@
     path: "{{ item }}"
   register: nvm_profile_stat
   loop:
-    - "{{ ansible_env.HOME }}/.bashrc"
-    - "{{ ansible_env.HOME }}/.zshrc"
-    - "{{ ansible_env.HOME }}/.profile"
+    - "{{ home_dir }}/.bashrc"
+    - "{{ home_dir }}/.zshrc"
+    - "{{ home_dir }}/.profile"
 
 - name: Remove nvm lines from shell profiles
   ansible.builtin.lineinfile:

@@ -26,19 +26,6 @@
         create_home: true
       no_log: true
 
-    - name: Check for docker group
-      ansible.builtin.getent:
-        database: group
-        key: docker
-        fail_key: false
-
-    - name: Add fivin to docker group, if present
-      ansible.builtin.user:
-        name: fivin
-        groups: docker
-        append: true
-      when: "'docker' in ansible_facts.getent_group"
-
     - name: Install fivin's SSH public key
       ansible.builtin.authorized_key:
         user: fivin
