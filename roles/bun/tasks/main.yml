@@ -1,4 +1,13 @@
 ---
+# bun's install script needs unzip to extract the release archive; not
+# present on a fresh Ubuntu image.
+- name: Install unzip (required by bun's installer)
+  ansible.builtin.apt:
+    name: unzip
+    state: present
+  become: true
+  when: ansible_facts['os_family'] == "Debian"
+
 - name: Install bun
   ansible.builtin.shell: curl -fsSL https://bun.sh/install | bash
   args:
